@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Poppins', sans-serif;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #111;
+      }
+      .container {
+        position: relative;
+        display: flex;
+        width: 700px;
+        overflow: hidden;
+        color: #fff;
+        mask-image: linear-gradient(to right, transparent, #fff 20%, #fff 80%, transparent);
+      }
+      .container span {
+        display: inline-block;
+        margin: 10px;
+        background-color: #333;
+        padding: 5px 10px;
+        border-radius: 5px;
+      }
+
+      .container div {
+        white-space: nowrap;
+      }
+
+      .container div:nth-child(1) {
+        animation: scroll01 calc(var(--time) * 1s) linear infinite;
+      }
+
+      .container div:nth-child(2) {
+        animation: scroll02 calc(var(--time) * 1s) linear infinite;
+        animation-delay: calc(var(--time) / 2 * -1s);
+      }
+
+      @keyframes scroll01 {
+        0% {
+          transform: translateX(100%);
+        }
+        100% {
+          transform: translateX(-100%);
+        }
+      }
+
+      @keyframes scroll02 {
+        0% {
+          transform: translateX(0%);
+        }
+        100% {
+          transform: translateX(-200%);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container" style="--time: 20">
+      <div>
+        <span>HTML</span>
+        <span>CSS</span>
+        <span>JavaScript</span>
+        <span>NodeJS</span>
+        <span>React</span>
+        <span>Vue</span>
+        <span>Angular</span>
+      </div>
+      <div>
+        <span>HTML</span>
+        <span>CSS</span>
+        <span>JavaScript</span>
+        <span>NodeJS</span>
+        <span>React</span>
+        <span>Vue</span>
+        <span>Angular</span>
+      </div>
+    </div>
+    <div class="container" style="--time: 30">
+      <div>
+        <span>Fastify</span>
+        <span>Express</span>
+        <span>Nuxt</span>
+        <span>Remix</span>
+        <span>Next</span>
+        <span>Prisma</span>
+        <span>NestJS</span>
+      </div>
+      <div>
+        <span>Fastify</span>
+        <span>Express</span>
+        <span>Nuxt</span>
+        <span>Remix</span>
+        <span>Next</span>
+        <span>Prisma</span>
+        <span>NestJS</span>
+      </div>
+    </div>
+    <div class="container" style="--time: 15">
+      <div>
+        <span>Lambda</span>
+        <span>DynamoDB</span>
+        <span>S3</span>
+        <span>CloudFormation</span>
+        <span>CDK</span>
+        <span>CloudFront</span>
+        <span>CloudWatch</span>
+      </div>
+      <div>
+        <span>Lambda</span>
+        <span>DynamoDB</span>
+        <span>S3</span>
+        <span>CloudFormation</span>
+        <span>CDK</span>
+        <span>CloudFront</span>
+        <span>CloudWatch</span>
+      </div>
+    </div>
+  </body>
+</html>
