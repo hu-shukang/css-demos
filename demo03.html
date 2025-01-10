@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        font-size: 0px;
+      }
+
+      .wrapper {
+        display: flex;
+        height: 100vh;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .x-scroll {
+        --image-width: 400px;
+        --image-height: 300px;
+        --container-width: 1000px;
+        width: var(--container-width);
+        height: var(--image-height);
+      }
+
+      .x-scroll-content {
+        height: var(--container-width);
+        width: var(--image-height);
+        overflow-y: scroll;
+        overflow-x: hidden;
+        transform-origin: 0 0;
+        transform: rotate(270deg) translateX(calc(var(--image-height) * -1));
+        scroll-snap-type: y mandatory;
+      }
+
+      .image-list {
+        white-space: nowrap;
+        display: block;
+        transform-origin: 0 0;
+        transform: rotate(90deg) translateY(calc(var(--image-height) * -1));
+      }
+
+      .image-list .card {
+        width: var(--image-width);
+        height: var(--image-height);
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 2rem;
+        font-weight: bold;
+        color: #fff;
+        background-color: var(--color);
+        scroll-snap-align: start;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="x-scroll">
+        <div class="x-scroll-content">
+          <div class="image-list">
+            <div class="card" style="--color: #49c17e">1</div>
+            <div class="card" style="--color: #aaca17">2</div>
+            <div class="card" style="--color: #ae9062">3</div>
+            <div class="card" style="--color: #f6adf8">4</div>
+            <div class="card" style="--color: #d4605a">5</div>
+            <div class="card" style="--color: #daa6a4">6</div>
+            <div class="card" style="--color: #545880">7</div>
+            <div class="card" style="--color: #96072a">8</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
