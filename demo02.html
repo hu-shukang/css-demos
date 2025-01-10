@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      ::-webkit-scrollbar {
+        width: 1px;
+        height: 1px;
+      }
+
+      ::-webkit-scrollbar-button {
+        width: 1px;
+        height: 1px;
+      }
+
+      body {
+        background: #111;
+      }
+
+      div {
+        box-sizing: border-box;
+      }
+
+      .horizontal-scroll-wrapper {
+        position: absolute;
+        display: block;
+        top: 0;
+        left: 0;
+        width: calc(250px + 1px);
+        max-height: 750px;
+        margin: 0;
+        background: #abc;
+        overflow-y: auto;
+        overflow-x: hidden;
+        transform: rotate(-90deg) translateY(-250px);
+        transform-origin: right top;
+      }
+      .horizontal-scroll-wrapper > div {
+        display: block;
+        padding: 5px;
+        background: var(--color);
+        transform: rotate(90deg);
+      }
+
+      .squares > div {
+        width: 250px;
+        height: 250px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="horizontal-scroll-wrapper squares">
+      <div style="--color: #96072a">item 1</div>
+      <div style="--color: #545880">item 2</div>
+      <div style="--color: #daa6a4">item 3</div>
+      <div style="--color: #d4605a">item 4</div>
+      <div style="--color: #f6adf8">item 5</div>
+      <div style="--color: #ae9062">item 6</div>
+      <div style="--color: #aaca17">item 7</div>
+      <div style="--color: #49c17e">item 8</div>
+    </div>
+  </body>
+</html>
