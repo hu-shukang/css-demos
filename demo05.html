@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    div.auth-fit {
+      width: 300px;
+      height: 300px;
+      padding: 10px;
+      background-color: #f0f0f0;
+      resize: both;
+      overflow: auto;
+      container-name: auth-fit-container;
+      container-type: size;
+    }
+
+    div.auth-fit p {
+      font-size: 1rem;
+    }
+
+    @container auth-fit-container (width > 500px) {
+      div.auth-fit p {
+        font-size: 1.2rem;
+      }
+    }
+
+    @container auth-fit-container (width < 200px) {
+      div.auth-fit p {
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-fit">
+    <p>
+      this is content
+    </p>
+  </div>
+</body>
+</html>
