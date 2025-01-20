@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+    img {
+      filter: url(#noise);
+    }
+  </style>
+</head>
+<body>
+  <svg style="display: none;">
+    <defs>
+      <filter id="noise" color-interpolation-filters="linearRGB" filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse">
+        <feTurbulence id="feTurbulence" type="fractalNoise" baseFrequency="0 0.00001" numOctaves="2" seed="2" stitchTiles="stitch" x="0%" y="0%" width="100%" height="100%" result="turbulence"/>
+        <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="20" xChannelSelector="R" yChannelSelector="B" x="0%" y="0%" width="100%" height="100%" result="displacementMap1"/>
+      </filter>
+    </defs>
+  </svg>
+  
+  <img id="image" src="dog.jpg" alt="" srcset="">
+
+  <script>
+    const image = document.getElementById('image');
+    const feTurbulence = document.getElementById('feTurbulence');
+    let value = 0.00001;
+    let step = 0.06;
+    const animation = () => {
+      value += step;
+      if (value > 0.4) {
+        step = step * -1;
+      }
+      feTurbulence.setAttribute('baseFrequency', `0 ${value}`);
+      if (value < 0.00001 && step < 0) {
+        step = step * -1;
+        value = 0.00001;
+        return;
+      }
+      requestAnimationFrame(animation);
+    };
+
+    image.onmouseenter = () => {
+      animation();
+    };
+  </script>
+</body>
+</html>
