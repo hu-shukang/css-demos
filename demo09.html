@@ -1,75 +1,79 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>可变字体动画</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Smooch+Sans:wght@100..900&display=swap" rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>可变字体动画</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Smooch+Sans:wght@100..900&display=swap" rel="stylesheet" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background-color: #000;
-      color: #fff;
-    }
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #000;
+        color: #fff;
+      }
 
-    .animated-text {
-      --wght: 100;
-      --wdth: 100;
-      --opacity: 1;
-      --letter-spacing: 0;
-      --font-size: 10vw;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 10rem;
-      font-family: "Smooch Sans", serif;
-      font-optical-sizing: auto;
-      font-weight: 100;
-      font-style: normal;
-    }
+      .animated-text {
+        --wght: 100;
+        --wdth: 100;
+        --opacity: 1;
+        --letter-spacing: 0;
+        --font-size: 10vw;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 10rem;
+        font-family: 'Smooch Sans', serif;
+        font-optical-sizing: auto;
+        font-weight: 100;
+        font-style: normal;
+      }
 
-    .animated-text:hover {
-      --wght: 600;
-      --wdth: 300;
-      --letter-spacing: 0.6rem;
-    }
+      .animated-text:hover {
+        --wght: 600;
+        --wdth: 300;
+        --letter-spacing: 0.6rem;
+      }
 
-    .animated-text .letter {
-      display: inline-block;
-      font-variation-settings: 'wght' var(--wght), 'wdth' var(--wdth);
-      opacity: var(--opacity);
-      letter-spacing: var(--letter-spacing);
-      font-size: var(--font-size);
-      transition: font-variation-settings 1s ease-in-out, letter-spacing 2s ease-in-out;
-    }
-  </style>
-</head>
-<body>
-  <div class="animated-text">
-    <span class="letter">H</span>
-    <span class="letter">e</span>
-    <span class="letter">l</span>
-    <span class="letter">l</span>
-    <span class="letter">o</span>
-    <span class="letter">,</span>
-    <span class="letter">&nbsp;</span>
-    <span class="letter">W</span>
-    <span class="letter">o</span>
-    <span class="letter">r</span>
-    <span class="letter">l</span>
-    <span class="letter">d</span>
-    <span class="letter">!</span>
-  </div>
-</body>
+      .animated-text .letter {
+        display: inline-block;
+        font-variation-settings:
+          'wght' var(--wght),
+          'wdth' var(--wdth);
+        opacity: var(--opacity);
+        letter-spacing: var(--letter-spacing);
+        font-size: var(--font-size);
+        transition:
+          font-variation-settings 1s ease-in-out,
+          letter-spacing 2s ease-in-out;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="animated-text">
+      <span class="letter">H</span>
+      <span class="letter">e</span>
+      <span class="letter">l</span>
+      <span class="letter">l</span>
+      <span class="letter">o</span>
+      <span class="letter">,</span>
+      <span class="letter">&nbsp;</span>
+      <span class="letter">W</span>
+      <span class="letter">o</span>
+      <span class="letter">r</span>
+      <span class="letter">l</span>
+      <span class="letter">d</span>
+      <span class="letter">!</span>
+    </div>
+  </body>
 </html>
