@@ -4,55 +4,60 @@ import {
 } from 'aws-lambda';
 
 export const handler: CognitoUserPoolTriggerHandler = async (event) => {
-  // 只在认证流程里生效
   if (event.triggerSource !== 'DefineAuthChallenge_Authentication') {
     return event;
   }
 
   const session = event.request.session || [];
 
-  if (session.length === 0) {
-    // 第一次调用：让 Cognito 继续走 SRP 握手（不要下发 CUSTOM_CHALLENGE）
+  // ── 阶段一：处理 SRP 握手后的 PASSWORD_VERIFIER
+  // 当收到 SRP_A 完成（event.request.session = [{challengeName: 'SRP_A', challengeResult: true}]）时，
+  // 明确下发 PASSWORD_VERIFIER，让 Cognito 做内置密码验证 :contentReference[oaicite:0]{index=0}
+  if (
+    session.length === 1 &&
+    session[0].challengeName === 'SRP_A' &&
+    session[0].challengeResult === true
+  ) {
     event.response.issueTokens = false;
     event.response.failAuthentication = false;
-    // 不设置 challengeName，Cognito 会用默认的 USER_SRP_AUTH
-  } else {
-    const last = session[session.length - 1];
-
-    // 如果 SRP 握手已经走完（PASSWORD_VERIFIER 成功），开始自定义挑战
-    const passedSrp =
-      session.some(
-        (s) =>
-          s.challengeName === 'PASSWORD_VERIFIER' &&
-          s.challengeResult === true
-      ) && !session.some((s) => s.challengeName === 'CUSTOM_CHALLENGE');
-
-    if (passedSrp) {
-      event.response.issueTokens = false;
-      event.response.failAuthentication = false;
-      event.response.challengeName = 'CUSTOM_CHALLENGE';
-    }
-    // 自定义挑战通过：发 Token
-    else if (last.challengeName === 'CUSTOM_CHALLENGE' && last.challengeResult) {
-      event.response.issueTokens = true;
-      event.response.failAuthentication = false;
-    }
-    // 自定义挑战失败超过次数：拒绝
-    else if (
-      last.challengeName === 'CUSTOM_CHALLENGE' &&
-      last.challengeResult === false &&
-      session.filter((s) => s.challengeName === 'CUSTOM_CHALLENGE').length >= 3
-    ) {
-      event.response.issueTokens = false;
-      event.response.failAuthentication = true;
-    }
-    // 其他情况：重试自定义挑战
-    else {
-      event.response.issueTokens = false;
-      event.response.failAuthentication = false;
-      event.response.challengeName = 'CUSTOM_CHALLENGE';
-    }
+    event.response.challengeName = 'PASSWORD_VERIFIER';
+    return event;
   }
 
+  // ── 阶段二：在 PASSWORD_VERIFIER 验证通过后，下发自定义挑战 CUSTOM_CHALLENGE
+  if (
+    session.length === 2 &&
+    session[1].challengeName === 'PASSWORD_VERIFIER' &&
+    session[1].challengeResult === true
+  ) {
+    event.response.issueTokens = false;
+    event.response.failAuthentication = false;
+    event.response.challengeName = 'CUSTOM_CHALLENGE';
+    return event;
+  }
+
+  // ── 阶段三：自定义挑战通过，发放 Tokens
+  if (session.some(
+    (s) => s.challengeName === 'CUSTOM_CHALLENGE' && s.challengeResult === true
+  )) {
+    event.response.issueTokens = true;
+    event.response.failAuthentication = false;
+    return event;
+  }
+
+  // 自定义挑战失败超过 3 次，拒绝认证
+  const fails = session.filter(
+    (s) => s.challengeName === 'CUSTOM_CHALLENGE' && s.challengeResult === false
+  );
+  if (fails.length >= 3) {
+    event.response.issueTokens = false;
+    event.response.failAuthentication = true;
+    return event;
+  }
+
+  // ── 其它情况（比如首次调用），启动 SRP_A 阶段
+  event.response.issueTokens = false;
+  event.response.failAuthentication = false;
+  event.response.challengeName = 'SRP_A';
   return event;
 };
