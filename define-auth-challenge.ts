@@ -22,22 +22,20 @@ export const handler: DefineAuthChallengeTriggerHandler = async (
     return event;
   }
 
-  // 检查用户是否处于强制修改密码状态
   const isForceChangePassword = userAttributes && userAttributes['cognito:user_status'] === 'FORCE_CHANGE_PASSWORD';
 
-  // 初始登录尝试 (可能是SRP_A，也可能是空的session，取决于配置)
-  // 或者，用户正在进行我们的自定义挑战流程
   if (session && session.length > 0) {
     const lastChallenge = session[session.length - 1];
 
-    // 情况1: SRP 流程开始，但用户需要强制密码重置
-    if (lastChallenge.challengeName === 'SRP_A' && isForceChangePassword) {
-      console.log('SRP_A challenge, but user is FORCE_CHANGE_PASSWORD. Redirecting to CUSTOM_CHALLENGE for EMAIL_OTP_STEP.');
+    // 拦截点：当Cognito准备进入 PASSWORD_VERIFIER 阶段时，
+    // 如果用户需要强制重置密码，则转到我们的自定义流程。
+    if (lastChallenge.challengeName === 'PASSWORD_VERIFIER' && isForceChangePassword) {
+      console.log('PASSWORD_VERIFIER challenge, but user is FORCE_CHANGE_PASSWORD. Redirecting to CUSTOM_CHALLENGE for EMAIL_OTP_STEP.');
       response.issueTokens = false;
       response.failAuthentication = false;
       response.challengeName = 'CUSTOM_CHALLENGE'; // 开始我们的OTP流程
     }
-    // 情况2: 正在进行我们的 CUSTOM_CHALLENGE 流程
+    // 如果正在进行我们的 CUSTOM_CHALLENGE 流程
     else if (lastChallenge.challengeName === 'CUSTOM_CHALLENGE') {
       if (lastChallenge.challengeResult === true) { // 上一个自定义挑战成功
         if (lastChallenge.challengeMetadata === EMAIL_OTP_STEP_METADATA) {
@@ -60,53 +58,61 @@ export const handler: DefineAuthChallengeTriggerHandler = async (
         response.issueTokens = false;
       }
     }
-    // 情况3: 其他Cognito内置挑战（例如，PASSWORD_VERIFIER 完成SRP, NEW_PASSWORD_REQUIRED等）
-    // 如果我们想完全覆盖 FORCE_CHANGE_PASSWORD，需要确保不让 Cognito 默认处理它
-    else if (isForceChangePassword) {
-        // 如果 Cognito 尝试了其他挑战（如 NEW_PASSWORD_REQUIRED），但我们想用自定义流程
-        console.log(`User is FORCE_CHANGE_PASSWORD, but current challenge is ${lastChallenge.challengeName}. Intercepting for CUSTOM_CHALLENGE (EMAIL_OTP).`);
+    // 对于 SRP_A 阶段，或者其他不由我们 FORCE_CHANGE_PASSWORD 逻辑处理的阶段，
+    // 让 Cognito 默认行为继续。
+    // 如果是 SRP_A，Cognito会期望客户端响应，然后可能会再次调用 DefineAuthChallenge 进入 PASSWORD_VERIFIER。
+    // 如果是 PASSWORD_VERIFIER 且用户不是 FORCE_CHANGE_PASSWORD，则 Cognito 会验证密码。
+    else if (lastChallenge.challengeName === 'SRP_A') {
+        console.log('SRP_A challenge. Allowing Cognito to proceed with SRP.');
+        // 不需要修改 response，Cognito会等待客户端响应SRP_A
+        // response.issueTokens = false; // (Cognito 默认)
+        // response.failAuthentication = false; // (Cognito 默认)
+        // response.challengeName = 'SRP_A'; // (Cognito 默认)
+    } else if (lastChallenge.challengeName === 'PASSWORD_VERIFIER' && !isForceChangePassword && lastChallenge.challengeResult === true) {
+        // 标准SRP登录成功完成 (用户提供了正确的密码，且不是强制修改密码)
+        console.log('Standard SRP (PASSWORD_VERIFIER) successful. Issuing tokens.');
+        response.issueTokens = true;
+        response.failAuthentication = false;
+    } else if (lastChallenge.challengeName === 'PASSWORD_VERIFIER' && !isForceChangePassword && lastChallenge.challengeResult === false) {
+        console.log('Standard SRP (PASSWORD_VERIFIER) failed.');
+        response.failAuthentication = true;
+        response.issueTokens = false;
+    }
+    // 考虑 Cognito 可能会直接提出 NEW_PASSWORD_REQUIRED 如果它检测到 FORCE_CHANGE_PASSWORD 状态
+    // 即使我们用了 CUSTOM_WITH_SRP
+    else if (lastChallenge.challengeName === 'NEW_PASSWORD_REQUIRED' && isForceChangePassword) {
+        console.log('NEW_PASSWORD_REQUIRED challenge by Cognito, but user is FORCE_CHANGE_PASSWORD. Redirecting to CUSTOM_CHALLENGE for EMAIL_OTP_STEP.');
         response.issueTokens = false;
         response.failAuthentication = false;
         response.challengeName = 'CUSTOM_CHALLENGE';
     }
-    // 其他情况，让Cognito默认处理或失败 (取决于你的整体策略)
     else {
-      console.log(`Unhandled session challenge: ${lastChallenge.challengeName}. Defaulting to Cognito behavior or failing.`);
-      // 如果不是强制重置密码，并且不是我们的自定义挑战，那么可能是标准的SRP登录流程完成
-      // 例如，如果 lastChallenge.challengeName 是 'PASSWORD_VERIFIER' 并且 challengeResult 是 true
-      if (lastChallenge.challengeName === 'PASSWORD_VERIFIER' && lastChallenge.challengeResult === true && !isForceChangePassword) {
-          console.log('Standard SRP password verification successful. Issuing tokens.');
-          response.issueTokens = true;
-          response.failAuthentication = false;
-      } else if (lastChallenge.challengeName !== 'PASSWORD_VERIFIER' || lastChallenge.challengeResult === false) {
-          // 如果不是成功的 PASSWORD_VERIFIER，或者其他未处理的挑战，则失败
-          console.log('Standard flow did not complete successfully or unhandled challenge. Failing authentication.');
-          response.failAuthentication = true;
-          response.issueTokens = false;
-      }
-      // 如果没有上面的 if/else if 覆盖，这里的 response 维持 Cognito 之前的决定
+      console.log(`Unhandled session challenge: ${lastChallenge.challengeName}. Letting Cognito decide or failing.`);
+      // 如果是其他未明确处理的挑战，并且我们没有特定的逻辑，可以让 Cognito 的决定生效，或者明确失败。
+      // 为了安全起见，如果不是我们明确允许的路径，可以考虑失败。
+      // 但这里要小心，不要干扰不相关的 Cognito 流程。
+      // 如果没有上述 if/else if 覆盖，这里的 response 维持 Cognito 之前的决定。
+      // 如果 Cognito 认为应该失败，它会设置 failAuthentication=true。
+      // 如果它想继续另一个挑战，它会设置 challengeName。
+      // 我们主要确保的是，如果 isForceChangePassword，最终会走到我们的 CUSTOM_CHALLENGE。
     }
   }
-  // 初始请求，session 为空 (如果 authFlowType 不是 USER_SRP_AUTH 或 CUSTOM_WITH_SRP，而是纯 CUSTOM_AUTH)
+  // 初始请求，session 为空 (通常在 USER_SRP_AUTH 或 CUSTOM_WITH_SRP 流程中，session 会有 SRP_A)
+  // 但如果某些配置或错误导致 session 为空，并且用户需要重置密码：
   else if ((!session || session.length === 0) && isForceChangePassword) {
-    console.log('No session and user is FORCE_CHANGE_PASSWORD. Issuing CUSTOM_CHALLENGE for EMAIL_OTP_STEP.');
+    console.log('No session OR initial call and user is FORCE_CHANGE_PASSWORD. Issuing CUSTOM_CHALLENGE for EMAIL_OTP_STEP.');
+    // 这种情况，如果客户端用的是 CUSTOM_WITH_SRP，通常DefineAuthChallenge第一次被调用时，session已经有SRP_A了。
+    // 但为了覆盖边缘情况，或者如果authFlowType是纯 CUSTOM_AUTH：
     response.issueTokens = false;
     response.failAuthentication = false;
     response.challengeName = 'CUSTOM_CHALLENGE';
   }
-  // 对于非强制修改密码的初始登录（例如，标准SRP登录，session为空）
-  // Cognito 会自动处理，Define Auth Challenge 可能不需要特别做什么，除非你想改变默认行为。
-  // 如果 session 为空且不是 FORCE_CHANGE_PASSWORD，Cognito 会尝试 SRP_A (如果客户端用 SRP 方式)
-  // 此时，Define Auth Challenge 的 response 应该不设置 challengeName，或者明确设置为 'SRP_A' (虽然通常不需要)
-  // Cognito 的默认行为会处理 SRP_A -> PASSWORD_VERIFIER。
-  // 我们主要关注的是如何将 FORCE_CHANGE_PASSWORD 用户拉入我们的自定义流程。
+  // 初始请求，session 为空，非强制修改密码：让 Cognito 默认 SRP 流程开始
   else if ((!session || session.length === 0) && !isForceChangePassword) {
-      console.log('No session, not FORCE_CHANGE_PASSWORD. Allowing Cognito default SRP flow.');
-      // 不需要修改 response，Cognito 会继续其默认流程 (例如，发起 SRP_A)
-      // response.issueTokens = false; // 默认
-      // response.failAuthentication = false; // 默认
+      console.log('No session OR initial call, not FORCE_CHANGE_PASSWORD. Allowing Cognito default SRP flow.');
+      // 不需要修改 response，Cognito 会继续其默认流程 (例如，客户端会收到 SRP_A 挑战，如果它发起的是 SRP)
   } else {
-      console.log('Unhandled define auth state. Failing.');
+      console.log('Unhandled define auth state (e.g., session might be present but not matching any logic and not FORCE_CHANGE_PASSWORD). Failing.');
       response.issueTokens = false;
       response.failAuthentication = true;
   }
