@@ -1,53 +1,26 @@
-/**
- * Create Auth Challenge Lambda
- * Generates a custom challenge, e.g., sends an OTP via email.
- */
-const createAuthChallenge = async (
-  event: CreateAuthChallengeTriggerEvent
-): Promise<CreateAuthChallengeTriggerEvent> => {
-  logger.info('CreateAuthChallenge event:', { event });
+// amplify/auth/create-auth-challenge.ts
+import type { CreateAuthChallengeTriggerHandler } from 'aws-lambda';
 
-  const SENDER_EMAIL_ADDRESS = process.env.SENDER_EMAIL_ADDRESS;
-  const SUBJECT = '確認コード通知'; // "Verification Code Notification"
-  const BODY_TEMPLATE = 'こちらのコードでサインインしてください: %s'; // "Please sign in with this code: %s"
+export const handler: CreateAuthChallengeTriggerHandler = async (event) => {
+  console.log('Create Auth Challenge Trigger:', JSON.stringify(event, null, 2));
 
-  if (!SENDER_EMAIL_ADDRESS) {
-    logger.error('SENDER_EMAIL_ADDRESS environment variable is not set.');
-    throw new Error('Email service configuration error.'); // This will cause Lambda to fail
+  if (event.request.challengeName === 'CUSTOM_CHALLENGE') {
+    // 这是我们为首次登录定义的挑战
+    // 可以根据 event.request.session 来实现多步骤的首次登录挑战
+    // 例如，第一步：设置密码；第二步：同意T&C
+
+    // 假设我们的首次登录挑战是要求用户设置一个新密码
+    event.response.publicChallengeParameters = {
+      challengeType: 'INITIAL_SETUP_NEW_PASSWORD', // 告诉客户端这是什么类型的挑战
+      username: event.request.userAttributes.email || event.userName, // 方便客户端显示
+    };
+    // privateChallengeParameters 可以用来存储一些后续验证需要的信息，但在此简单示例中可能不需要
+    event.response.privateChallengeParameters = {};
+    event.response.privateChallengeParameters.answer = 'dummy-answer'; // 实际中不会这样硬编码答案
+
+    // challengeMetadata 可以用于追踪流程，例如第几步
+    event.response.challengeMetadata = `SESSION_${event.request.session.length}_CHALLENGE_NEW_PASSWORD`;
   }
-
-  const userAttributes = event.request.userAttributes;
-  const emailAddress = userAttributes?.email;
-
-  if (!emailAddress) {
-    logger.error('Email address not found in user attributes.');
-    throw new EmailNotFoundException(); // Custom exception
-  }
-
-  // Generate a 6-digit OTP
-  const code = randomInt(0, 999999).toString().padStart(6, '0');
-  const mailBody = BODY_TEMPLATE.replace('%s', code);
-
-  const sendEmailParams = {
-    Destination: { ToAddresses: [emailAddress] },
-    Message: {
-      Body: { Text: { Data: mailBody, Charset: 'UTF-8' } },
-      Subject: { Data: SUBJECT, Charset: 'UTF-8' },
-    },
-    Source: SENDER_EMAIL_ADDRESS,
-  };
-
-  try {
-    const emailResponse = await sesClient.send(new SendEmailCommand(sendEmailParams));
-    logger.info('Email sent successfully.', { messageId: emailResponse.MessageId });
-  } catch (error) {
-    logger.error('Failed to send email via SES.', error as Error);
-    throw new EmailNotDeliveredException(); // Custom exception
-  }
-
-  event.response.publicChallengeParameters = {}; // No public parameters in Python version
-  event.response.privateChallengeParameters = { code }; // Store OTP for verification
-  event.response.challengeMetadata = 'CUSTOM_CHALLENGE_OTP'; // Optional: metadata for the challenge
-
+  console.log('Returning event:', JSON.stringify(event, null, 2));
   return event;
 };
