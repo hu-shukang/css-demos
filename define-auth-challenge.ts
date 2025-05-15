@@ -1,126 +1,60 @@
-import {
-  DefineAuthChallengeTriggerEvent,
-  // Ensure you have these specific types if not already, or use the general CognitoUserPoolTriggerEvent and cast
-} from 'aws-lambda';
-import { Logger } from '@aws-lambda-powertools/logger'; // Assuming you use this
+// amplify/auth/define-auth-challenge.ts
+import type { DefineAuthChallengeTriggerHandler } from 'aws-lambda';
 
-const logger = new Logger(); // Or however you initialize
+export const handler: DefineAuthChallengeTriggerHandler = async (event) => {
+  console.log('Define Auth Challenge Trigger:', JSON.stringify(event, null, 2));
 
-// Helper to get the last successful challenge name from the session
-const getLastSuccessfulChallenge = (session: DefineAuthChallengeTriggerEvent['request']['session'] | undefined): string | null => {
-  if (!session || session.length === 0) return null;
-  // Find the last challenge that was successful and was not a setup step like SRP_A
-  for (let i = session.length - 1; i >= 0; i--) {
-    if (session[i].challengeResult === true && session[i].challengeName !== 'SRP_A') { // SRP_A is a setup, not a user completion
-      return session[i].challengeName;
-    }
-    // If PASSWORD_VERIFIER was the last and it was true, it's a success for that step
-    if (session[i].challengeName === 'PASSWORD_VERIFIER' && session[i].challengeResult === true) return session[i].challengeName;
+  if (event.request.userNotFound) {
+    event.response.issueTokens = false;
+    event.response.failAuthentication = true;
+    console.log('User not found.');
+    return event;
   }
-  return null;
-};
 
+  const needsInitialSetup = event.request.userAttributes['custom:needs_initial_setup'] === 'true';
 
-export const defineAuthChallenge = (
-  event: DefineAuthChallengeTriggerEvent
-): DefineAuthChallengeTriggerEvent => {
-  logger.info('DefineAuthChallenge event:', { event });
-
-  const session = event.request.session || []; // Ensure session is an array
-  const response = event.response;
-
-  const userStatus = event.request.userAttributes?.['cognito:user_status'];
-  const needsPasswordChange = userStatus === 'FORCE_CHANGE_PASSWORD';
-
-  // Default to not issuing tokens and not failing, let the logic decide
-  response.issueTokens = false;
-  response.failAuthentication = false;
-
-  // --- Scenario 1: User needs to set a new password (e.g., AdminCreateUser) ---
-  if (needsPasswordChange) {
-    logger.info('User is in FORCE_CHANGE_PASSWORD state.');
-    const lastSuccessfulStep = getLastSuccessfulChallenge(session);
-
-    if (session.length === 0 || !lastSuccessfulStep) {
-      // If no steps completed, or only SRP_A, and password change needed:
-      // First step for this user: Send OTP (your CUSTOM_CHALLENGE)
-      logger.info('Issuing CUSTOM_CHALLENGE (OTP) as first step for password change flow.');
-      response.challengeName = 'CUSTOM_CHALLENGE';
-    } else if (lastSuccessfulStep === 'CUSTOM_CHALLENGE') {
-      // OTP was successful. Now prompt for new password.
-      logger.info('CUSTOM_CHALLENGE (OTP) was successful. Issuing NEW_PASSWORD_REQUIRED.');
-      response.challengeName = 'NEW_PASSWORD_REQUIRED';
-    } else if (lastSuccessfulStep === 'NEW_PASSWORD_REQUIRED') {
-      // New password successfully set. Issue tokens.
-      logger.info('NEW_PASSWORD_REQUIRED was successful. Issuing tokens.');
-      response.issueTokens = true;
-    } else if (session.length > 0 && session[session.length-1].challengeResult === false) {
-        logger.warn('A challenge failed in the FORCE_CHANGE_PASSWORD flow.');
-        response.failAuthentication = true;
-    }
-     else {
-      // Unexpected state in password change flow
-      logger.warn('Unexpected state in FORCE_CHANGE_PASSWORD flow.', { session });
-      response.failAuthentication = true;
-    }
-  }
-  // --- Scenario 2: Regular SRP Authentication Flow ---
-  // (This assumes your 'CUSTOM_CHALLENGE' is the OTP part of a normal SRP login)
-  else if (session.length === 0 && event.request.userNotFound !== true ) { // User exists, no session, implies start of a new flow
-    // For SRP, Cognito issues SRP_A first. This lambda is called *after* SRP_A.
-    // So, if session is empty here, it's likely not an SRP flow, or it's the very first call *for* SRP.
-    // If your user pool client allows CUSTOM_AUTH directly, this could be its starting point.
-    // Let's assume for now that Cognito handles SRP_A initiation and then calls this.
-    // If it's the very first call and Cognito expects *us* to start SRP, that's different.
-    // But usually, Cognito sends SRP_A if SRP is enabled.
-    // If you want a non-SRP flow to start with OTP:
-    logger.info('Starting a non-SRP flow or first call. Assuming Cognito handles SRP_A or this is custom. Issuing CUSTOM_CHALLENGE (OTP).');
-    response.challengeName = 'CUSTOM_CHALLENGE';
-
-  } else if (session.length > 0) {
-    const currentChallengeDetails = session[session.length - 1];
-    const challengeName = currentChallengeDetails.challengeName;
-    const challengeResult = currentChallengeDetails.challengeResult;
-
-    if (!challengeResult) {
-        logger.warn(`Challenge ${challengeName} failed.`);
-        response.failAuthentication = true;
-        return event;
-    }
-
-    // SRP Flow continuation
-    if (challengeName === 'SRP_A') {
-      logger.info('SRP_A successful. Moving to PASSWORD_VERIFIER.');
-      response.challengeName = 'PASSWORD_VERIFIER';
-    } else if (challengeName === 'PASSWORD_VERIFIER') {
-      logger.info('PASSWORD_VERIFIER successful. Moving to CUSTOM_CHALLENGE (OTP).');
-      response.challengeName = 'CUSTOM_CHALLENGE'; // Your OTP challenge
-    } else if (challengeName === 'CUSTOM_CHALLENGE') {
-      // This is the OTP. If successful, and no password change needed, issue tokens.
-      logger.info('CUSTOM_CHALLENGE (OTP) successful. Issuing tokens.');
-      response.issueTokens = true;
+  // 新的登录尝试
+  if (!event.request.session || event.request.session.length === 0) {
+    if (needsInitialSetup) {
+      console.log('User needs initial setup. Issuing CUSTOM_CHALLENGE.');
+      event.response.challengeName = 'CUSTOM_CHALLENGE';
+      event.response.issueTokens = false;
+      event.response.failAuthentication = false;
     } else {
-      // Unknown state in SRP or general flow
-      logger.warn('Unknown challenge state in session.', { session });
-      response.failAuthentication = true;
+      // 已经设置过的用户，走标准密码验证 (SRP)
+      console.log('User already set up. Issuing SRP_A challenge.');
+      event.response.challengeName = 'SRP_A'; // 或者 PASSWORD_VERIFIER 如果你想用 USER_PASSWORD_AUTH
+      event.response.issueTokens = false;
+      event.response.failAuthentication = false;
     }
-  } else if (event.request.userNotFound) {
-    logger.warn('User not found.');
-    response.failAuthentication = true; // Standard behavior
-  }
-   else {
-    // Should not be reached if logic above is comprehensive
-    logger.error('Reached unexpected part of defineAuthChallenge logic.');
-    response.failAuthentication = true;
-  }
+  } else {
+    // 用户已经响应过挑战
+    const previousChallenge = event.request.session[event.request.session.length - 1];
+    const { challengeName, challengeResult } = previousChallenge;
 
-  // Ensure failAuthentication is explicitly true if not issuing tokens and no next challenge
-  if (!response.issueTokens && !response.challengeName && !response.failAuthentication) {
-    logger.info('No tokens to issue and no next challenge, but not explicitly failed. Setting failAuthentication to true.');
-    response.failAuthentication = true;
+    if (challengeName === 'CUSTOM_CHALLENGE' && challengeResult === true) {
+      console.log('Custom challenge successful. Issuing tokens.');
+      event.response.issueTokens = true;
+      event.response.failAuthentication = false;
+      // 可选：在这里更新 userAttributes，例如将 custom:needs_initial_setup 设置为 false
+      // 注意：直接在这里更新属性可能不是最佳实践，通常在 Verify Auth Challenge 成功后操作
+    } else if (challengeName === 'SRP_A' || challengeName === 'PASSWORD_VERIFIER') {
+       // 如果是标准流程，Cognito 会处理，这里通常不需要特殊逻辑，除非你想介入
+       // 但在此场景下，我们关注的是 CUSTOM_CHALLENGE 后的流程
+       // 如果 CUSTOM_CHALLENGE 成功了，我们上面已经 issueTokens = true 了
+       // 如果标准流程到这里，说明是常规登录或 CUSTOM_CHALLENGE 后的密码验证（如果你的流程如此设计）
+       // 此时如果 SRP/PASSWORD_VERIFIER 验证成功，Cognito 会自动颁发令牌
+       // 因此，如果前面的 CUSTOM_CHALLENGE 没成功，或者这是常规登录的第一步，Cognito会处理
+       // 若我们希望在 CUSTOM_CHALLENGE 成功后直接发令牌，则上面那段逻辑已覆盖
+       // 若CUSTOM_CHALLENGE后还需密码验证，则流程会更复杂，这里假设CUSTOM_CHALLENGE成功即登录
+       event.response.issueTokens = false; // Cognito 会根据 PASSWORD_VERIFIER 的结果决定是否 issue
+       event.response.failAuthentication = false; // Cognito 会判断
+    } else {
+      console.log('Challenge failed or unknown state. Failing authentication.');
+      event.response.issueTokens = false;
+      event.response.failAuthentication = true;
+    }
   }
-
-
-  logger.info('DefineAuthChallenge response:', { response });
+  console.log('Returning event:', JSON.stringify(event, null, 2));
   return event;
 };
