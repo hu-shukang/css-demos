@@ -1,10 +1,11 @@
 /**
- * 压缩前端的图片文件，仅根据最大文件大小进行压缩并保持长宽比。
+ * 压缩前端的图片文件，并强制转换为 JPEG 格式。
+ *
  * @param imageFile - 待压缩的图片文件 (File 类型)。
  * @param maxSizeKB - 压缩后的最大文件大小，单位是 KB。
- * @returns 返回一个 Promise，该 Promise 解决后会得到压缩后的 Blob 对象。
+ * @returns 返回一个 Promise，该 Promise 解决后会得到压缩后的 JPEG 格式的 File 对象。
  */
-const compressImage = (imageFile: File, maxSizeKB: number): Promise<Blob> => {
+const compressImageToJpeg = (imageFile: File, maxSizeKB: number): Promise<File> => {
   return new Promise((resolve, reject) => {
     // 检查文件类型是否是图片
     if (!imageFile.type.startsWith('image/')) {
@@ -23,23 +24,19 @@ const compressImage = (imageFile: File, maxSizeKB: number): Promise<Blob> => {
         let canvas = document.createElement('canvas');
         let ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 
-        // 获取图片的原始尺寸
         const { width, height } = img;
-
-        // 设置 canvas 尺寸为图片的原始尺寸
         canvas.width = width;
         canvas.height = height;
 
-        // 将图片绘制到 canvas 上
         ctx.drawImage(img, 0, 0, width, height);
 
-        // 初始化压缩质量
         let quality = 0.9;
         const maxSizeBytes = maxSizeKB * 1024;
+        const outputMimeType = 'image/jpeg';
 
         // 递归压缩函数
         const recursiveCompress = () => {
-          // 使用 toBlob 方法导出为 Blob
+          // 强制将图片导出为 JPEG 格式
           canvas.toBlob((blob) => {
             if (!blob) {
               reject(new Error('Failed to create blob from canvas.'));
@@ -48,14 +45,20 @@ const compressImage = (imageFile: File, maxSizeKB: number): Promise<Blob> => {
 
             // 如果大小已经小于最大尺寸，或者质量已经降到很低了（比如0.1），就返回
             if (blob.size <= maxSizeBytes || quality < 0.1) {
-              resolve(blob);
+              // 创建一个新的 File 对象
+              const outputFileName = imageFile.name.split('.')[0] + '.jpeg';
+              const compressedFile = new File([blob], outputFileName, {
+                type: outputMimeType,
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
               return;
             }
 
             // 否则，降低质量，继续递归压缩
             quality -= 0.1;
             recursiveCompress();
-          }, imageFile.type, quality);
+          }, outputMimeType, quality);
         };
 
         // 开始递归压缩
@@ -84,21 +87,21 @@ fileInput?.addEventListener('change', async (event) => {
     const originalFile = files[0];
     const maxSizeKB = 200; // 设定压缩后最大为 200KB
 
-    console.log(`原始文件大小: ${(originalFile.size / 1024).toFixed(2)} KB`);
+    console.log(`原始文件大小: ${(originalFile.size / 1024).toFixed(2)} KB, 格式: ${originalFile.type}`);
 
     try {
-      // 调用压缩函数，只传入 File 和最大尺寸
-      const compressedBlob = await compressImage(originalFile, maxSizeKB);
+      // 调用新的压缩函数
+      const compressedJpegFile = await compressImageToJpeg(originalFile, maxSizeKB);
 
-      console.log(`压缩后文件大小: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
+      console.log(`压缩后文件大小: ${(compressedJpegFile.size / 1024).toFixed(2)} KB, 格式: ${compressedJpegFile.type}`);
+      console.log(`文件名: ${compressedJpegFile.name}`);
 
       // 创建一个 URL 来预览压缩后的图片
-      const compressedImageUrl = URL.createObjectURL(compressedBlob);
+      const compressedImageUrl = URL.createObjectURL(compressedJpegFile);
       const imgElement = document.getElementById('compressed-image') as HTMLImageElement;
       if (imgElement) {
         imgElement.src = compressedImageUrl;
       }
-
     } catch (error) {
       console.error('压缩图片时出错:', error);
     }
