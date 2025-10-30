@@ -1,1 +1,1 @@
-/^(?:\+?\d+-)?\d+(?:-\d+){2}$|^\+?\d+$/
+const escapedInput = form.global.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
