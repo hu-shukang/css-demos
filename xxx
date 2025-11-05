@@ -1,3 +1,55 @@
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+res.setHeader('Accept-CH', 'Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version');
+
+```typescript
+interface ClientHintHeaders {
+  'sec-ch-ua-platform'?: string;
+  'sec-ch-ua-platform-version'?: string;
 }
+
+function isWindows10Request(headers: ClientHintHeaders): boolean {
+  const platform = headers['sec-ch-ua-platform'];
+  const version = headers['sec-ch-ua-platform-version'];
+  
+  if (!platform || !version) {
+    return false;
+  }
+  
+  // 移除引号进行比较
+  const cleanPlatform = platform.replace(/"/g, '');
+  const cleanVersion = version.replace(/"/g, '');
+  
+  return cleanPlatform === 'Windows' && 
+         cleanVersion.startsWith('10.');
+}
+```
+
+```typescript
+async function isWindows10(): Promise<boolean> {
+  // 检查浏览器是否支持 User-Agent Client Hints
+  if (!navigator.userAgentData) {
+    console.warn('User-Agent Client Hints not supported');
+    return false;
+  }
+  
+  // 获取基本平台信息（低熵值）
+  const platform = navigator.userAgentData.platform;
+  
+  if (platform !== 'Windows') {
+    return false;
+  }
+  
+  // 获取详细的平台版本信息（高熵值，需要用户权限）
+  try {
+    const highEntropyValues = await navigator.userAgentData.getHighEntropyValues([
+      'platformVersion'
+    ]);
+    
+    const version = highEntropyValues.platformVersion;
+    
+    // Windows 10 的版本号通常以 "10." 开头
+    return version.startsWith('10.');
+  } catch (error) {
+    console.error('Failed to get high entropy values:', error);
+    return false;
+  }
+```
