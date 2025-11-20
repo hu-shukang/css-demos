@@ -1,55 +1,193 @@
-res.setHeader('Accept-CH', 'Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version');
+VPC Endpoint Policy の内容は、各サービスの用途によって異なります。以下に各エンドポイント向けの推奨ポリシーを示します。
 
-```typescript
-interface ClientHintHeaders {
-  'sec-ch-ua-platform'?: string;
-  'sec-ch-ua-platform-version'?: string;
-}
+## 基本方針
 
-function isWindows10Request(headers: ClientHintHeaders): boolean {
-  const platform = headers['sec-ch-ua-platform'];
-  const version = headers['sec-ch-ua-platform-version'];
-  
-  if (!platform || !version) {
-    return false;
-  }
-  
-  // 移除引号进行比较
-  const cleanPlatform = platform.replace(/"/g, '');
-  const cleanVersion = version.replace(/"/g, '');
-  
-  return cleanPlatform === 'Windows' && 
-         cleanVersion.startsWith('10.');
+最小権限の原則に基づき、必要なリソースとアクションのみを許可します。
+
+### 1. ECR (ecr.api, ecr.dkr)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowPull",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetAuthorizationToken"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalAccount": "YOUR_ACCOUNT_ID"
+        }
+      }
+    }
+  ]
 }
 ```
 
-```typescript
-async function isWindows10(): Promise<boolean> {
-  // 检查浏览器是否支持 User-Agent Client Hints
-  if (!navigator.userAgentData) {
-    console.warn('User-Agent Client Hints not supported');
-    return false;
-  }
-  
-  // 获取基本平台信息（低熵值）
-  const platform = navigator.userAgentData.platform;
-  
-  if (platform !== 'Windows') {
-    return false;
-  }
-  
-  // 获取详细的平台版本信息（高熵值，需要用户权限）
-  try {
-    const highEntropyValues = await navigator.userAgentData.getHighEntropyValues([
-      'platformVersion'
-    ]);
-    
-    const version = highEntropyValues.platformVersion;
-    
-    // Windows 10 的版本号通常以 "10." 开头
-    return version.startsWith('10.');
-  } catch (error) {
-    console.error('Failed to get high entropy values:', error);
-    return false;
-  }
+### 2. Secrets Manager
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowSecretsAccess",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ],
+      "Resource": "arn:aws:secretsmanager:ap-northeast-1:YOUR_ACCOUNT_ID:secret:*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalAccount": "YOUR_ACCOUNT_ID"
+        }
+      }
+    }
+  ]
+}
 ```
+
+### 3. S3 (Gateway)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowS3Access",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR_BUCKET_NAME",
+        "arn:aws:s3:::YOUR_BUCKET_NAME/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalAccount": "YOUR_ACCOUNT_ID"
+        }
+      }
+    }
+  ]
+}
+```
+
+### 4. SES (email-smtp)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowSMTP",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "ses:SendRawEmail",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalAccount": "YOUR_ACCOUNT_ID"
+        }
+      }
+    }
+  ]
+}
+```
+
+### 5. CloudWatch Logs
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowLogs",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalAccount": "YOUR_ACCOUNT_ID"
+        }
+      }
+    }
+  ]
+}
+```
+
+### 6. Step Functions (states)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowStepFunctions",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "states:StartExecution",
+        "states:DescribeExecution",
+        "states:GetExecutionHistory"
+      ],
+      "Resource": "arn:aws:states:ap-northeast-1:YOUR_ACCOUNT_ID:stateMachine:*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalAccount": "YOUR_ACCOUNT_ID"
+        }
+      }
+    }
+  ]
+}
+```
+
+### 7. SNS
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowSNS",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "sns:Publish",
+        "sns:Subscribe"
+      ],
+      "Resource": "arn:aws:sns:ap-northeast-1:YOUR_ACCOUNT_ID:*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalAccount": "YOUR_ACCOUNT_ID"
+        }
+      }
+    }
+  ]
+}
+```
+
+## 注意点
+
+- `YOUR_ACCOUNT_ID` と `YOUR_BUCKET_NAME` は実際の値に置き換えてください
+- 本番環境では、Resource を具体的な ARN に絞ることを推奨します
+- `aws:PrincipalAccount` 条件で、同一アカウントからのアクセスのみに制限しています
+
+具体的なユースケース（Lambda から ECR イメージを pull する、特定の Secret のみアクセスするなど）があれば、それに合わせてより厳密なポリシーを作成できます。
